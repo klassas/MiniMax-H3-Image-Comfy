@@ -73,12 +73,18 @@ def build_workflow(
     cfg: float = 1.0,
     image_names: list | None = None,
     filename_prefix: str = "h3_image/job",
+    extra_loras: list | None = None,
 ) -> dict:
     """Returns the API-format graph: {node_id: {"class_type", "inputs"}}.
 
     image_names: files already uploaded to ComfyUI's input/ directory,
     in <Picture N> order. Empty/None means text-to-image. width/height
     of 0 mean "inherit the first reference's size" (edit mode only).
+
+    extra_loras: up to 3 slots of (lora_name, strength) or None, chained
+    as LoraLoaderModelOnly nodes between the UNETLoader and the sampler
+    (the conditioning node does not consume the model, so the sampler's
+    model input is the only place a LoRA can patch in).
     """
     image_names = list(image_names or [])
 
@@ -129,10 +135,31 @@ def build_workflow(
         "inputs": {"conditioning": ["conditioning", 0]},
     }
 
+    # Optional LoRA chain on the model branch: UNETLoader -> [LoRA x N]
+    # -> KSampler.model. Slots that are None (not configured, or set to
+    # strength 0 for this job) are skipped entirely.
+    model_ref = ["unet_loader", 0]
+    for i, item in enumerate(extra_loras or []):
+        if not item:
+            continue
+        lora_name, lora_strength = item
+        if not lora_name:
+            continue
+        node_id = "lora_extra" if i == 0 else f"lora_extra_{i + 1}"
+        nodes[node_id] = {
+            "class_type": "LoraLoaderModelOnly",
+            "inputs": {
+                "model": model_ref,
+                "lora_name": lora_name,
+                "strength_model": float(lora_strength),
+            },
+        }
+        model_ref = [node_id, 0]
+
     nodes["sampler"] = {
         "class_type": "KSampler",
         "inputs": {
-            "model": ["unet_loader", 0],
+            "model": model_ref,
             "seed": seed,
             "steps": steps,
             "cfg": cfg,
