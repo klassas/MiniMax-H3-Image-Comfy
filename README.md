@@ -80,6 +80,21 @@ repo with only these 3 files (same approach as
    load); after that, a 4 MP image should take well under a minute of
    GPU time (6 steps).
 
+## Extra LoRAs (optional, added 2026-11-25)
+
+Up to 3 LoRA slots, the same mechanism as the MiniMax H3 video worker.
+Configure by env vars on the endpoint, then restart the worker (no
+rebuild): `EXTRA_LORA_KEY=<object key in the B2 bucket>` (or
+`EXTRA_LORA_URL=<direct https URL>` — a set URL wins) plus optional
+`EXTRA_LORA_STRENGTH=<0-2, default 0.5>`; slots 2/3 use the `_2` / `_3`
+suffixes. Files are fetched at boot into ComfyUI's models/loras; a
+configured-but-unfetchable LoRA fails the boot on purpose. The app
+steers each slot per request with `lora_strength{,_2,_3}` (0 = slot
+skipped for that job). First LoRA fitted: "V.H.S - MMH3I - Real
+Pussy.safetensors" (Civitai model 3054468, v2.0) in slot 1 via
+EXTRA_LORA_KEY — anatomy close-ups are this model's weak area and the
+LoRA is trained for exactly that.
+
 ## Job contract
 
 Text-to-image: `{"input": {"prompt": "..."}}` → 2048×2048 by default.
